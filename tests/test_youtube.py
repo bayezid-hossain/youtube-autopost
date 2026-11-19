@@ -7,7 +7,8 @@ import pytest
 from googleapiclient.errors import HttpError
 
 from autopost.models import Metadata
-from autopost.youtube import QuotaExceeded, build_body, upload
+from autopost import youtube
+from autopost.youtube import RETRIES, QuotaExceeded, build_body, upload
 
 META = Metadata(title="T", description="D", tags=("a", "b"))
 SLOT = datetime(2026, 11, 19, 12, 0, tzinfo=timezone.utc)
@@ -62,9 +63,12 @@ def test_upload_returns_video_id_after_chunks(video):
     assert service.videos.return_value.insert.call_args.kwargs["part"] == "snippet,status"
 
 
-@pytest.mark.parametrize("reason", [b"quotaExceeded", b"uploadLimitExceeded"])
-def test_quota_errors_raise_quota_exceeded(video, reason):
-    service = service_with(FakeRequest([http_error(403, b'{"reason": "' + reason + b'"}')]))
+@pytest.mark.parametrize(
+    "status, reason",
+    [(403, b"quotaExceeded"), (403, b"uploadLimitExceeded"), (400, b"uploadLimitExceeded")],
+)
+def test_quota_errors_raise_quota_exceeded(video, status, reason):
+    service = service_with(FakeRequest([http_error(status, b'{"reason": "' + reason + b'"}')]))
     with pytest.raises(QuotaExceeded):
         upload(service, video, {})
 
@@ -73,3 +77,23 @@ def test_other_http_errors_propagate(video):
     service = service_with(FakeRequest([http_error(400, b"badRequest")]))
     with pytest.raises(HttpError):
         upload(service, video, {})
+
+
+@pytest.fixture
+def sleeps(monkeypatch):
+    calls = []
+    monkeypatch.setattr(youtube, "_sleep", calls.append)
+    return calls
+
+
+def test_transport_error_is_retried_then_succeeds(video, sleeps):
+    service = service_with(FakeRequest([OSError("reset"), (None, {"id": "yt9"})]))
+    assert upload(service, video, {}) == "yt9"
+    assert sleeps == [2]
+
+
+def test_transport_errors_exhaust_retries(video, sleeps):
+    service = service_with(FakeRequest([OSError("reset")] * (RETRIES + 1)))
+    with pytest.raises(OSError):
+        upload(service, video, {})
+    assert len(sleeps) == RETRIES

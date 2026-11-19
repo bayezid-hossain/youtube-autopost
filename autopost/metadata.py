@@ -90,15 +90,20 @@ def _fit_tags(tags: list[str]) -> tuple[str, ...]:
     return tuple(kept)
 
 
+def _truncate_bytes(text: str, limit: int) -> str:
+    # YouTube's description limit is in UTF-8 bytes; "ignore" drops a split trailing character
+    return text.encode("utf-8")[:limit].decode("utf-8", "ignore")
+
+
 def finalize(meta: dict, kind: str) -> Metadata:
     title = _strip_angles(meta["title"]).strip()[:TITLE_MAX].strip() or "Untitled"
     description = _strip_angles(meta["description"]).strip()
     if kind == "short" and SHORTS_TAG.lower() not in description.lower():
-        room = DESCRIPTION_MAX - len(SHORTS_TAG) - 2
-        description = f"{description[:room]}\n\n{SHORTS_TAG}".strip()
+        room = DESCRIPTION_MAX - len(("\n\n" + SHORTS_TAG).encode("utf-8"))
+        description = f"{_truncate_bytes(description, room)}\n\n{SHORTS_TAG}".strip()
     return Metadata(
         title=title,
-        description=description[:DESCRIPTION_MAX],
+        description=_truncate_bytes(description, DESCRIPTION_MAX),
         tags=_fit_tags(meta["tags"]),
     )
 

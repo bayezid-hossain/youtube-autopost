@@ -141,3 +141,14 @@ def test_malformed_sidecar_falls_through_to_generator(cfg):
 def test_no_generator_uses_fallback(cfg):
     meta = build_metadata("cake", "video", None, None, cfg)
     assert meta.title == "cake"
+
+
+def test_finalize_description_limit_is_bytes_for_video():
+    meta = finalize({"title": "t", "description": "আ" * 3000, "tags": []}, "video")
+    assert len(meta.description.encode()) <= 5000
+
+
+def test_finalize_description_limit_is_bytes_for_short():
+    meta = finalize({"title": "t", "description": "আ" * 3000, "tags": []}, "short")
+    assert len(meta.description.encode()) <= 5000
+    assert meta.description.endswith("#Shorts")

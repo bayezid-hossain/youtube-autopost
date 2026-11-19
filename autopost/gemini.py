@@ -26,6 +26,8 @@ def make_gemini(client, model: str, context: str) -> Generator:
             contents=PROMPT.format(label=LABELS[kind], stem=stem, context=context or "(none)"),
             config={"response_mime_type": "application/json"},
         )
+        if not response.text:
+            raise ValueError("empty Gemini response")
         return parse_sidecar("gemini.json", response.text)
 
     return generate

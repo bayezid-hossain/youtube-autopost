@@ -36,3 +36,9 @@ def test_generator_raises_on_bad_json():
     generate = make_gemini(client_returning("sorry, no"), "m", "")
     with pytest.raises(ValueError):
         generate("cake", "video")
+
+
+def test_generator_raises_on_empty_response():
+    generate = make_gemini(client_returning(None), "m", "")
+    with pytest.raises(ValueError, match="empty Gemini response"):
+        generate("cake", "video")

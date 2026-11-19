@@ -1,9 +1,11 @@
 """YouTube upload: request body + resumable upload."""
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httplib2
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 
@@ -11,7 +13,10 @@ from autopost.config import Config
 from autopost.models import Metadata
 
 UPLOAD_CHUNK = 10 * 1024 * 1024
-RETRIES = 3  # retries 5xx/network errors with backoff, resuming from the last chunk
+# next_chunk(num_retries) retries only 5xx/429 responses; transport errors (connection
+# reset etc.) are retried by upload() itself, up to RETRIES times, resuming from the last chunk.
+RETRIES = 3
+_sleep = time.sleep
 _QUOTA_REASONS = (b"quotaExceeded", b"uploadLimitExceeded", b"dailyLimitExceeded")
 
 
@@ -40,11 +45,19 @@ def upload(service, path: Path, body: dict) -> str:
     request = service.videos().insert(part="snippet,status", body=body, media_body=media)
     response = None
     try:
+        attempt = 0
         while response is None:
-            _, response = request.next_chunk(num_retries=RETRIES)
+            try:
+                _, response = request.next_chunk(num_retries=RETRIES)
+                attempt = 0
+            except (OSError, httplib2.HttpLib2Error):
+                attempt += 1
+                if attempt > RETRIES:
+                    raise
+                _sleep(2 ** attempt)
     except HttpError as exc:
         content = exc.content or b""
-        if exc.resp.status == 403 and any(reason in content for reason in _QUOTA_REASONS):
+        if exc.resp.status in (400, 403) and any(reason in content for reason in _QUOTA_REASONS):
             raise QuotaExceeded(content.decode("utf-8", "replace")) from exc
         raise
     return response["id"]
