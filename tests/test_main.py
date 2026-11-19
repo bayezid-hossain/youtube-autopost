@@ -172,3 +172,12 @@ def test_format_summary_dry_run_and_empty_queue():
     assert text.splitlines()[0].startswith("autopost dry run:")
     assert "- would upload video b.mp4 at 2026-11-19 12:00 UTC" in text
     assert "Queue empty: add more files to Drive." in text
+
+
+def test_cli_help_exits_zero(capsys):
+    from autopost.main import main
+
+    with pytest.raises(SystemExit) as exc:
+        main(["--help"])
+    assert exc.value.code == 0
+    assert "--dry-run" in capsys.readouterr().out

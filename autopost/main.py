@@ -1,20 +1,27 @@
 """One autopost run: plan today's slots, upload, record, move, summarize."""
 from __future__ import annotations
 
+import argparse
 import logging
 import os
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
-from autopost.config import Config
-from autopost.drive import split_listing
+from google.auth.exceptions import RefreshError
+from googleapiclient.discovery import build
+
+from autopost.auth import MissingSecret, credentials_from_env
+from autopost.config import Config, load_config
+from autopost.drive import Drive, split_listing
 from autopost.ledger import Ledger
 from autopost.metadata import Generator, build_metadata, pick_sidecar
 from autopost.models import DriveFile, Job
+from autopost.notify import send_telegram, write_step_summary
 from autopost.scheduler import plan_day
-from autopost.youtube import QuotaExceeded, build_body
+from autopost.youtube import QuotaExceeded, build_body, upload
 
 log = logging.getLogger("autopost")
 KINDS = ("video", "short")
@@ -150,3 +157,55 @@ def format_summary(result: RunResult, dry_run: bool) -> str:
     if not any(left.values()):
         lines.append("Queue empty: add more files to Drive.")
     return "\n".join(lines)
+
+
+def _make_generator(cfg: Config) -> Optional[Generator]:
+    key = os.environ.get("GEMINI_API_KEY")
+    if not key:
+        log.warning("GEMINI_API_KEY not set: using fallback metadata")
+        return None
+    from google import genai
+
+    from autopost.gemini import make_gemini
+
+    return make_gemini(genai.Client(api_key=key), cfg.gemini_model, cfg.default_description)
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = argparse.ArgumentParser(prog="autopost", description="Upload queued Google Drive videos to YouTube.")
+    parser.add_argument("--dry-run", action="store_true", help="plan and generate metadata only; upload nothing")
+    parser.add_argument("--config", default="config.yaml", help="path to config.yaml")
+    parser.add_argument("--ledger", default="posted_log.json", help="path to posted_log.json")
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    cfg = load_config(args.config)
+    try:
+        creds = credentials_from_env()
+        drive = Drive(build("drive", "v3", credentials=creds, cache_discovery=False))
+        youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
+        with tempfile.TemporaryDirectory() as tmp:
+            result = run(
+                cfg,
+                drive,
+                lambda path, body: upload(youtube, path, body),
+                Ledger(args.ledger),
+                _make_generator(cfg),
+                datetime.now(timezone.utc),
+                args.dry_run,
+                Path(tmp),
+            )
+    except MissingSecret as exc:
+        log.error("%s. Add them as GitHub repository secrets.", exc)
+        return 1
+    except RefreshError as exc:
+        log.error(
+            "Google auth failed (%s). Re-run auth_setup.py and update the GOOGLE_REFRESH_TOKEN secret.", exc
+        )
+        return 1
+
+    text = format_summary(result, args.dry_run)
+    print(text)
+    write_step_summary(text)
+    send_telegram(text)
+    return 1 if result.failed else 0
