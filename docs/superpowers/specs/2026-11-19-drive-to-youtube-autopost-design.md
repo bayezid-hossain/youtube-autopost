@@ -96,7 +96,7 @@ Validation rejects: total slots > `daily_cap`, `daily_cap` > 6, unknown `publish
    1. Download the video to the runner's temp dir (streamed, chunked).
    2. Build metadata (sidecar → Gemini → fallback).
    3. Upload: `privacyStatus=private`; if `publish_mode=scheduled`, also set `publishAt=<slot as UTC ISO8601>`.
-   4. Append `{drive_file_id, youtube_video_id, slot, uploaded_at}` to `posted_log.json`.
+   4. Append `{drive_file_id, youtube_video_id, publish_at, uploaded_at}` to `posted_log.json`.
    5. Move video + sidecar to `posted/`.
    6. Delete the temp file.
 6. Commit the updated `posted_log.json` back to the repo (workflow step).
