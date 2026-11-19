@@ -14,7 +14,7 @@ drive:                          # folder ID = the last part of the folder's URL 
   queue_shorts_folder_id: "REPLACE_WITH_QUEUE_SHORTS_FOLDER_ID"
   posted_folder_id: "REPLACE_WITH_POSTED_FOLDER_ID"
 
-defaults:                       # used when no sidecar and Gemini is unavailable
+defaults:                       # used when no sidecar and Gemini is unavailable; description is also given to Gemini as channel context
   description: ""
   tags: []
   category_id: "22"             # 22 = People & Blogs

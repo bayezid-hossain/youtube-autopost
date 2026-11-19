@@ -2,9 +2,9 @@ name: autopost
 
 on:
   schedule:
-    # GitHub cron is UTC. This is 06:00 in Asia/Dhaka (UTC+6).
-    # For another timezone: 06:00 local converted to UTC, as "MINUTE HOUR * * *".
-    - cron: "0 0 * * *"
+    # GitHub cron is UTC. This is 06:07 in Asia/Dhaka (UTC+6); a non-zero minute avoids GitHub's top-of-hour load delays.
+    # For another timezone: 06:07 local converted to UTC, as "MINUTE HOUR * * *".
+    - cron: "7 0 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -25,6 +25,8 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - uses: actions/setup-python@v5
         with:
@@ -50,4 +52,10 @@ jobs:
           git config user.name "autopost-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add posted_log.json
-          git diff --cached --quiet || (git commit -m "chore: update posted log [skip ci]" && git push)
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update posted log [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin "${{ github.ref_name }}" && git push origin "HEAD:${{ github.ref_name }}" && exit 0
+            sleep $((i * 5))
+          done
+          echo "::error::could not push posted_log.json"; exit 1

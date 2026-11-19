@@ -12,6 +12,7 @@ from typing import Callable, Optional
 
 from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from autopost.auth import MissingSecret, credentials_from_env
 from autopost.config import Config, load_config
@@ -191,6 +192,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     try:
         cfg = load_config(args.config)
+        folder_ids = (cfg.queue_videos_folder_id, cfg.queue_shorts_folder_id, cfg.posted_folder_id)
+        if any(folder_id.startswith("REPLACE_WITH_") for folder_id in folder_ids):
+            log.error("config.yaml still has placeholder Drive folder IDs; set drive.* to your real folder IDs")
+            return 1
         creds = credentials_from_env()
         drive = Drive(build("drive", "v3", credentials=creds, cache_discovery=False))
         youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
@@ -212,6 +217,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         log.error(
             "Google auth failed (%s). Re-run auth_setup.py and update the GOOGLE_REFRESH_TOKEN secret.", exc
         )
+        return 1
+    except HttpError as exc:
+        log.error("Google API error: %s. If this is a 404, check the drive.* folder IDs in config.yaml.", exc)
         return 1
     except (ValueError, OSError) as exc:
         log.error("%s", exc)

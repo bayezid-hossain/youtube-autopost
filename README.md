@@ -10,7 +10,7 @@ Every morning a GitHub Actions job takes the next files from your Drive queue fo
 
 | `publish_mode` | What happens | When to use |
 |---|---|---|
-| `private` | All of today's uploads happen at the 06:00 run, as private videos with metadata filled in. You publish them in YouTube Studio. | Until the YouTube API audit is approved |
+| `private` | All of today's uploads happen at the daily run, as private videos with metadata filled in. Before the API audit, uploads are private, and YouTube may **lock** them private: unverified API projects created after 2020-07-28 are "restricted to private viewing mode", and users report they cannot be made public even in Studio. The step 9 test confirms whether your channel can publish them; if locked, they must be re-uploaded after the audit. Submit the audit early. | Until the YouTube API audit is approved |
 | `scheduled` | Same, plus YouTube auto-publishes each video at its slot time (`publishAt`). | After audit approval |
 
 ## One-time setup (≈45 min, all free)
@@ -27,9 +27,9 @@ Every morning a GitHub Actions job takes the next files from your Drive queue fo
    Sign in with the **channel's** Google account. Copy the three printed values.
 5. **Gemini key:** https://aistudio.google.com → *Get API key* (free tier).
 6. **Drive folders:** create `autopost/queue/videos`, `autopost/queue/shorts`, `autopost/posted`. Open each and copy the ID from the URL (`drive.google.com/drive/folders/<ID>`) into `config.yaml`. Set `timezone` and `slots` there too.
-7. **Cron time:** in `.github/workflows/autopost.yml` set the cron to 06:00 *your* time in UTC. Examples: Asia/Dhaka `0 0 * * *`, Asia/Kolkata `30 0 * * *`, Europe/London (winter) `0 6 * * *`, America/New_York (winter) `0 11 * * *`.
+7. **Cron time:** in `.github/workflows/autopost.yml` set the cron to 06:07 *your* time in UTC. Use a non-zero minute (avoids GitHub's top-of-hour delays). Examples: Asia/Dhaka `7 0 * * *`, Asia/Kolkata `37 0 * * *`, Europe/London (winter) `7 6 * * *`, America/New_York (winter) `7 11 * * *`. In timezones with daylight saving time the run shifts one hour later in summer (UTC cron doesn't follow DST), so keep all slots after 07:30.
 8. **GitHub:** create a **private** repo, push this folder, then add secrets under *Settings → Secrets and variables → Actions*: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GEMINI_API_KEY`. Optional: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (create a bot with @BotFather; get your chat ID from @userinfobot).
-9. **Test:** *Actions → autopost → Run workflow* with **dry_run** ticked. Check the plan in the job summary. Then put one small test video in `queue/shorts`, run again without dry run, and confirm: private video in Studio, metadata filled in, file moved to `posted/`, new commit updating `posted_log.json`.
+9. **Test:** *Actions → autopost → Run workflow* with **dry_run** ticked. Check the plan in the job summary. Then put one small test video in `queue/shorts`, run again without dry run, and confirm: private video in Studio, metadata filled in, file moved to `posted/`, new commit updating `posted_log.json`. Manual runs only use today's slots that are still ahead. For a test late in the day, temporarily add a later slot. In Studio, try switching the test video to Public to see whether pre-audit uploads are locked.
 
 ## API audit (to auto-publish)
 
@@ -53,7 +53,7 @@ GitHub Pages is free only for **public** repos, so host the policy pages separat
 |---|---|
 | Run fails with "Google auth failed" | Run `python auth_setup.py client_secret.json` again and update `GOOGLE_REFRESH_TOKEN`. Check the consent screen is *In production*. |
 | "stopped: YouTube daily quota reached" | Normal if many uploads failed and retried; leftovers go tomorrow. |
-| Uploaded videos stuck private | Expected until the API audit is approved. |
+| Uploaded videos stuck private | Unverified API projects (created after 2020-07-28) are locked to private, and Studio may not let you switch them to Public. Submit the API audit; after approval, re-upload the locked videos. |
 | Slot error in config | Times must be quoted (`"18:00"`) and later than 06:30. |
 | Nothing uploads, "Queue empty" | Add files to `queue/videos` or `queue/shorts`. |
 | Run fails with `posted_log.json is corrupted` | Fix or restore the file from git history (`git log -p posted_log.json`); it must be a JSON list. |

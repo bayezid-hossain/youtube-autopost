@@ -5,7 +5,7 @@
 **App name:** Autopost
 
 **What does your app do?**
-Autopost is a single-user, internal tool. Each day it takes video files that I (the channel owner) placed in my own Google Drive folder and uploads them to my own YouTube channel with `videos.insert`, scheduled with `status.publishAt`. Titles, descriptions and tags come from a text file I write next to each video, or are drafted from the file name. It runs as a scheduled GitHub Actions job in my private repository.
+Autopost is a single-user, internal tool. Each day it takes video files that I (the channel owner) placed in my own Google Drive folder and uploads them to my own YouTube channel with `videos.insert`, scheduled with `status.publishAt`. Titles, descriptions and tags come from a text file I write next to each video, or are drafted from the file name using the Google Gemini API. It runs as a scheduled GitHub Actions job in my private repository.
 
 **Who are the users?** Only me, the channel owner. No other users, no public sign-up.
 

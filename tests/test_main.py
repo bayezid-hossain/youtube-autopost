@@ -215,3 +215,44 @@ def test_main_bad_config_returns_1_without_traceback(tmp_path, monkeypatch, raw_
         monkeypatch.setenv(name, "dummy")
 
     assert main(["--config", str(bad), "--ledger", str(tmp_path / "log.json")]) == 1
+
+
+def test_main_placeholder_drive_ids_return_1(tmp_path, monkeypatch, raw_config, caplog):
+    import yaml
+
+    from autopost.main import main
+
+    raw_config["drive"]["posted_folder_id"] = "REPLACE_WITH_POSTED_FOLDER_ID"
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(raw_config), encoding="utf-8")
+    for name in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"):
+        monkeypatch.setenv(name, "dummy")
+
+    with caplog.at_level("ERROR", logger="autopost"):
+        assert main(["--config", str(path), "--ledger", str(tmp_path / "log.json")]) == 1
+    assert "placeholder Drive folder IDs" in caplog.text
+
+
+def test_main_http_error_returns_1(tmp_path, monkeypatch, raw_config, caplog):
+    from unittest.mock import MagicMock
+
+    import httplib2
+    import yaml
+    from googleapiclient.errors import HttpError
+
+    import autopost.main as main_module
+
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(raw_config), encoding="utf-8")
+    for name in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"):
+        monkeypatch.setenv(name, "dummy")
+
+    def boom(*args, **kwargs):
+        raise HttpError(httplib2.Response({"status": 404}), b"not found")
+
+    monkeypatch.setattr(main_module, "build", lambda *a, **k: MagicMock())
+    monkeypatch.setattr(main_module, "run", boom)
+
+    with caplog.at_level("ERROR", logger="autopost"):
+        assert main_module.main(["--config", str(path), "--ledger", str(tmp_path / "log.json")]) == 1
+    assert "Google API error" in caplog.text
