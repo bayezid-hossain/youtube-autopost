@@ -154,3 +154,10 @@ def test_video_and_short_at_same_time_allowed(raw_config):
     raw_config["slots"] = {"videos": ["18:00"], "shorts": ["18:00"]}
     cfg = parse_config(raw_config)
     assert cfg.video_slots == cfg.short_slots == (time(18, 0),)
+
+
+def test_repo_config_yaml_is_valid():
+    from pathlib import Path
+
+    cfg = load_config(Path(__file__).parent.parent / "config.yaml")
+    assert len(cfg.video_slots) + len(cfg.short_slots) <= cfg.daily_cap

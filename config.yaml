@@ -1,0 +1,23 @@
+# Autopost settings. Times are 24h and MUST be in quotes ("18:00"), otherwise YAML misreads them.
+
+timezone: Asia/Dhaka            # your channel's IANA timezone
+publish_mode: private           # private = upload as private drafts (before API audit)
+                                # scheduled = private + auto-publish at slot time (after audit)
+daily_cap: 6                    # 1..6 (YouTube free API quota allows ~6 uploads/day)
+
+slots:                          # each slot must be later than 06:30; total slots <= daily_cap
+  videos: ["18:00"]
+  shorts: ["10:00", "13:00", "16:00", "20:00", "22:00"]
+
+drive:                          # folder ID = the last part of the folder's URL in Drive
+  queue_videos_folder_id: "REPLACE_WITH_QUEUE_VIDEOS_FOLDER_ID"
+  queue_shorts_folder_id: "REPLACE_WITH_QUEUE_SHORTS_FOLDER_ID"
+  posted_folder_id: "REPLACE_WITH_POSTED_FOLDER_ID"
+
+defaults:                       # used when no sidecar and Gemini is unavailable
+  description: ""
+  tags: []
+  category_id: "22"             # 22 = People & Blogs
+  made_for_kids: false
+
+gemini_model: gemini-flash-latest
