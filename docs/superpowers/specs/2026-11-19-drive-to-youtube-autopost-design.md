@@ -129,7 +129,7 @@ OAuth scopes: `https://www.googleapis.com/auth/youtube.upload`, `https://www.goo
 
 ## Audit support deliverables
 
-- `docs/privacy-policy.md` and `docs/terms.md`, served via GitHub Pages.
+- `docs/policy/privacy-policy.md` and `docs/policy/terms.md`, copied to a separate **public** repo and served via GitHub Pages (Pages on a private repo needs a paid plan).
 - `docs/audit-notes.md`: app description and use-case text to paste into the YouTube API audit form.
 
 ## One-time setup (documented in README)
@@ -141,7 +141,7 @@ OAuth scopes: `https://www.googleapis.com/auth/youtube.upload`, `https://www.goo
 5. Get Gemini API key from Google AI Studio.
 6. Create Drive folders `autopost/queue/videos`, `autopost/queue/shorts`, `autopost/posted`; put IDs in `config.yaml`.
 7. Create private GitHub repo, push, add secrets.
-8. Enable GitHub Pages for `docs/`; submit the YouTube API audit form.
+8. Publish the policy pages from a separate public repo via GitHub Pages; submit the YouTube API audit form.
 9. After approval: set `publish_mode: scheduled`.
 
 ## Testing
