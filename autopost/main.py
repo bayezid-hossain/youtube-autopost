@@ -1,0 +1,152 @@
+"""One autopost run: plan today's slots, upload, record, move, summarize."""
+from __future__ import annotations
+
+import logging
+import os
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable, Optional
+
+from autopost.config import Config
+from autopost.drive import split_listing
+from autopost.ledger import Ledger
+from autopost.metadata import Generator, build_metadata, pick_sidecar
+from autopost.models import DriveFile, Job
+from autopost.scheduler import plan_day
+from autopost.youtube import QuotaExceeded, build_body
+
+log = logging.getLogger("autopost")
+KINDS = ("video", "short")
+
+Uploader = Callable[[Path, dict], str]
+
+
+@dataclass
+class RunResult:
+    planned: list[Job] = field(default_factory=list)
+    uploaded: list[tuple[Job, str]] = field(default_factory=list)
+    failed: list[tuple[Job, str]] = field(default_factory=list)
+    quota_hit: bool = False
+    queue_left: dict[str, int] = field(default_factory=dict)
+
+
+def _stem(file: DriveFile) -> str:
+    return os.path.splitext(file.name)[0]
+
+
+def _queue_folder(cfg: Config, kind: str) -> str:
+    return cfg.queue_videos_folder_id if kind == "video" else cfg.queue_shorts_folder_id
+
+
+def _move_with_sidecars(drive, video: DriveFile, sidecars: list[DriveFile], src: str, dst: str) -> None:
+    for file in [video, *sidecars]:
+        drive.move(file.id, src, dst)
+
+
+def _read_sidecar(drive, files: list[DriveFile]) -> Optional[tuple[str, str]]:
+    chosen = pick_sidecar(files)
+    if chosen is None:
+        return None
+    try:
+        return chosen.name, drive.read_text(chosen.id)
+    except Exception as exc:
+        log.warning("could not read sidecar %s: %s", chosen.name, exc)
+        return None
+
+
+def _remove_quietly(path: Path) -> None:
+    """Delete a temp file; on Windows the upload may still hold it open, which must not mask the real error."""
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        log.warning("could not delete temp file %s: %s", path, exc)
+
+
+def run(
+    cfg: Config,
+    drive,
+    uploader: Uploader,
+    ledger: Ledger,
+    generate: Optional[Generator],
+    now: datetime,
+    dry_run: bool,
+    workdir: Path,
+) -> RunResult:
+    pending: dict[str, list[DriveFile]] = {}
+    sidecars: dict[str, dict[str, list[DriveFile]]] = {}
+    for kind in KINDS:
+        folder = _queue_folder(cfg, kind)
+        videos, sidecars[kind] = split_listing(drive.list_folder(folder))
+        pending[kind] = []
+        for video in videos:
+            if not ledger.has(video.id):
+                pending[kind].append(video)
+                continue
+            if dry_run:
+                continue
+            # uploaded on an earlier run but the move failed: retry the move only
+            try:
+                _move_with_sidecars(drive, video, sidecars[kind].get(_stem(video), []), folder, cfg.posted_folder_id)
+            except Exception as exc:
+                log.warning("could not move already-posted %s: %s", video.name, exc)
+
+    today = now.astimezone(cfg.timezone).date()
+    result = RunResult(planned=plan_day(today, now, cfg, pending["video"], pending["short"]))
+
+    for job in result.planned:
+        stem = _stem(job.file)
+        folder = _queue_folder(cfg, job.kind)
+        side_files = sidecars[job.kind].get(stem, [])
+        meta = build_metadata(stem, job.kind, _read_sidecar(drive, side_files), generate, cfg)
+        if dry_run:
+            log.info("[dry-run] %s %s at %s -> %r", job.kind, job.file.name, job.publish_at.isoformat(), meta.title)
+            continue
+
+        path = workdir / f"{job.file.id}{Path(job.file.name).suffix}"
+        try:
+            drive.download(job.file.id, path)
+            video_id = uploader(path, build_body(meta, cfg, job.publish_at))
+        except QuotaExceeded as exc:
+            log.warning("YouTube quota reached, stopping: %s", exc)
+            result.quota_hit = True
+            break
+        except Exception as exc:
+            log.error("failed %s: %s", job.file.name, exc)
+            result.failed.append((job, str(exc)))
+            continue
+        finally:
+            _remove_quietly(path)
+
+        ledger.add(job.file.id, video_id, job.publish_at, datetime.now(timezone.utc))
+        result.uploaded.append((job, video_id))
+        log.info("uploaded %s %s -> %s", job.kind, job.file.name, video_id)
+        try:
+            _move_with_sidecars(drive, job.file, side_files, folder, cfg.posted_folder_id)
+        except Exception as exc:
+            log.warning("uploaded %s but move failed (retried next run): %s", job.file.name, exc)
+
+    done = {kind: sum(1 for job, _ in result.uploaded if job.kind == kind) for kind in KINDS}
+    result.queue_left = {kind: len(pending[kind]) - done[kind] for kind in KINDS}
+    return result
+
+
+def format_summary(result: RunResult, dry_run: bool) -> str:
+    head = "autopost dry run" if dry_run else "autopost run"
+    lines = [
+        f"{head}: {len(result.uploaded)} uploaded, {len(result.failed)} failed, {len(result.planned)} planned"
+    ]
+    for job, video_id in result.uploaded:
+        lines.append(f"- uploaded {job.kind} {job.file.name} -> https://youtu.be/{video_id}")
+    for job, error in result.failed:
+        lines.append(f"- FAILED {job.kind} {job.file.name}: {error}")
+    if result.quota_hit:
+        lines.append("- stopped: YouTube daily quota reached")
+    if dry_run:
+        for job in result.planned:
+            lines.append(f"- would upload {job.kind} {job.file.name} at {job.publish_at:%Y-%m-%d %H:%M} UTC")
+    left = result.queue_left
+    lines.append(f"Queue left: {left.get('video', 0)} videos, {left.get('short', 0)} shorts")
+    if not any(left.values()):
+        lines.append("Queue empty: add more files to Drive.")
+    return "\n".join(lines)
