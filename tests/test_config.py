@@ -102,3 +102,55 @@ def test_load_config_rejects_non_mapping(tmp_path):
     path.write_text("- just\n- a list\n", encoding="utf-8")
     with pytest.raises(ConfigError, match="mapping"):
         load_config(path)
+
+
+@pytest.mark.parametrize("value", ["false", "true", 0, 1, "no"])
+def test_made_for_kids_must_be_bool(raw_config, value):
+    raw_config["defaults"]["made_for_kids"] = value
+    with pytest.raises(ConfigError, match="made_for_kids must be true or false"):
+        parse_config(raw_config)
+
+
+def test_made_for_kids_true_accepted(raw_config):
+    raw_config["defaults"]["made_for_kids"] = True
+    assert parse_config(raw_config).made_for_kids is True
+
+
+@pytest.mark.parametrize("value", ["cooking", {"a": 1}, 5])
+def test_tags_must_be_list(raw_config, value):
+    raw_config["defaults"]["tags"] = value
+    with pytest.raises(ConfigError, match="defaults.tags"):
+        parse_config(raw_config)
+
+
+def test_null_tags_means_empty(raw_config):
+    raw_config["defaults"]["tags"] = None
+    assert parse_config(raw_config).default_tags == ()
+
+
+def test_null_description_and_model_use_defaults(raw_config):
+    raw_config["defaults"]["description"] = None
+    raw_config["gemini_model"] = None
+    cfg = parse_config(raw_config)
+    assert cfg.default_description == ""
+    assert cfg.gemini_model == "gemini-flash-latest"
+
+
+@pytest.mark.parametrize("slots", ["18:00", ["18:00"]])
+def test_slots_must_be_mapping(raw_config, slots):
+    raw_config["slots"] = slots
+    with pytest.raises(ConfigError, match="slots"):
+        parse_config(raw_config)
+
+
+@pytest.mark.parametrize("kind", ["videos", "shorts"])
+def test_duplicate_slot_rejected(raw_config, kind):
+    raw_config["slots"][kind] = ["18:00", "18:00"]
+    with pytest.raises(ConfigError, match="duplicate"):
+        parse_config(raw_config)
+
+
+def test_video_and_short_at_same_time_allowed(raw_config):
+    raw_config["slots"] = {"videos": ["18:00"], "shorts": ["18:00"]}
+    cfg = parse_config(raw_config)
+    assert cfg.video_slots == cfg.short_slots == (time(18, 0),)

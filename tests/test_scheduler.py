@@ -1,5 +1,8 @@
 import dataclasses
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
+from zoneinfo import ZoneInfo
+
+import pytest
 
 from autopost.models import DriveFile
 from autopost.scheduler import plan_day
@@ -44,3 +47,16 @@ def test_daily_cap_limits_jobs(cfg):
 def test_publish_at_is_utc(cfg):
     jobs = plan_day(TODAY, utc(0), cfg, [f("v1")], [])
     assert jobs[0].publish_at.tzinfo == timezone.utc
+
+
+@pytest.mark.parametrize(
+    "day, expected_utc_hour",
+    [(date(2026, 7, 15), 22), (date(2026, 11, 19), 23)],  # EDT = UTC-4, EST = UTC-5
+)
+def test_publish_at_respects_dst(cfg, day, expected_utc_hour):
+    ny = dataclasses.replace(cfg, timezone=ZoneInfo("America/New_York"), video_slots=(time(18, 0),), short_slots=())
+    now = datetime(day.year, day.month, day.day, 0, 0, tzinfo=timezone.utc)
+    jobs = plan_day(day, now, ny, [f("v1")], [])
+    assert [j.publish_at for j in jobs] == [
+        datetime(day.year, day.month, day.day, expected_utc_hour, tzinfo=timezone.utc)
+    ]

@@ -56,6 +56,17 @@ def _parse_slot(value) -> time:
     return slot
 
 
+def _parse_slot_list(values, name: str) -> tuple[time, ...]:
+    if values is None:
+        values = []
+    if not isinstance(values, list):
+        raise ConfigError(f"slots.{name} must be a list of HH:MM times")
+    parsed = [_parse_slot(v) for v in values]
+    if len(set(parsed)) != len(parsed):
+        raise ConfigError(f"duplicate time in slots.{name}")
+    return tuple(sorted(parsed))
+
+
 def parse_config(raw: dict) -> Config:
     tz = _parse_timezone(raw.get("timezone"))
 
@@ -67,9 +78,13 @@ def parse_config(raw: dict) -> Config:
     if isinstance(cap, bool) or not isinstance(cap, int) or not 1 <= cap <= MAX_DAILY_UPLOADS:
         raise ConfigError(f"daily_cap must be an integer 1..{MAX_DAILY_UPLOADS}, got {cap!r}")
 
-    slots = raw.get("slots") or {}
-    video_slots = tuple(sorted(_parse_slot(s) for s in slots.get("videos") or []))
-    short_slots = tuple(sorted(_parse_slot(s) for s in slots.get("shorts") or []))
+    slots = raw.get("slots")
+    if slots is None:
+        slots = {}
+    if not isinstance(slots, dict):
+        raise ConfigError("slots must be a mapping with videos and/or shorts lists")
+    video_slots = _parse_slot_list(slots.get("videos"), "videos")
+    short_slots = _parse_slot_list(slots.get("shorts"), "shorts")
     total = len(video_slots) + len(short_slots)
     if total == 0:
         raise ConfigError("at least one slot is required under slots.videos or slots.shorts")
@@ -82,6 +97,15 @@ def parse_config(raw: dict) -> Config:
             raise ConfigError(f"drive.{key} is required")
 
     defaults = raw.get("defaults") or {}
+
+    made_for_kids = defaults.get("made_for_kids", False)
+    if not isinstance(made_for_kids, bool):
+        raise ConfigError("defaults.made_for_kids must be true or false")
+    tags = defaults.get("tags")
+    if tags is None:
+        tags = []
+    if not isinstance(tags, list):
+        raise ConfigError("defaults.tags must be a list of strings")
     return Config(
         timezone=tz,
         publish_mode=mode,
@@ -91,11 +115,11 @@ def parse_config(raw: dict) -> Config:
         queue_videos_folder_id=drive["queue_videos_folder_id"],
         queue_shorts_folder_id=drive["queue_shorts_folder_id"],
         posted_folder_id=drive["posted_folder_id"],
-        default_description=str(defaults.get("description", "")),
-        default_tags=tuple(str(t) for t in defaults.get("tags") or []),
+        default_description=str(defaults.get("description") or ""),
+        default_tags=tuple(str(t) for t in tags),
         category_id=str(defaults.get("category_id", "22")),
-        made_for_kids=bool(defaults.get("made_for_kids", False)),
-        gemini_model=str(raw.get("gemini_model", "gemini-flash-latest")),
+        made_for_kids=made_for_kids,
+        gemini_model=str(raw.get("gemini_model") or "gemini-flash-latest"),
     )
 
 
