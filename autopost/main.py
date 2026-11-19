@@ -125,7 +125,17 @@ def run(
         finally:
             _remove_quietly(path)
 
-        ledger.add(job.file.id, video_id, job.publish_at, datetime.now(timezone.utc))
+        try:
+            ledger.add(job.file.id, video_id, job.publish_at, datetime.now(timezone.utc))
+        except Exception as exc:
+            log.error(
+                "uploaded %s as YouTube video %s but ledger write failed: %s; stopping to avoid duplicates",
+                job.file.name,
+                video_id,
+                exc,
+            )
+            result.failed.append((job, f"uploaded as {video_id} but ledger write failed: {exc}"))
+            break
         result.uploaded.append((job, video_id))
         log.info("uploaded %s %s -> %s", job.kind, job.file.name, video_id)
         try:
@@ -179,8 +189,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    cfg = load_config(args.config)
     try:
+        cfg = load_config(args.config)
         creds = credentials_from_env()
         drive = Drive(build("drive", "v3", credentials=creds, cache_discovery=False))
         youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
@@ -202,6 +212,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         log.error(
             "Google auth failed (%s). Re-run auth_setup.py and update the GOOGLE_REFRESH_TOKEN secret.", exc
         )
+        return 1
+    except (ValueError, OSError) as exc:
+        log.error("%s", exc)
         return 1
 
     text = format_summary(result, args.dry_run)

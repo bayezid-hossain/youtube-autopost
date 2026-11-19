@@ -12,7 +12,7 @@ class Ledger:
         self.path = Path(path)
         if self.path.exists():
             try:
-                loaded = json.loads(self.path.read_text(encoding="utf-8"))
+                loaded = json.loads(self.path.read_text(encoding="utf-8-sig"))
             except json.JSONDecodeError as exc:
                 raise ValueError(f"{self.path} is corrupted: invalid JSON ({exc})") from exc
             if not isinstance(loaded, list):

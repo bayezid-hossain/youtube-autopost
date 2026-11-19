@@ -58,3 +58,9 @@ def test_add_writes_atomically(tmp_path, monkeypatch):
     ledger.add("b", "2", T, T)
     assert calls == [(path.with_name("posted_log.json.tmp"), path)]
     assert not path.with_name("posted_log.json.tmp").exists()
+
+
+def test_bom_prefixed_ledger_loads(tmp_path):
+    path = tmp_path / "posted_log.json"
+    path.write_text("\ufeff[]", encoding="utf-8")
+    assert Ledger(path).entries == []

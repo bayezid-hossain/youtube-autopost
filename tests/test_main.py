@@ -181,3 +181,37 @@ def test_cli_help_exits_zero(capsys):
         main(["--help"])
     assert exc.value.code == 0
     assert "--dry-run" in capsys.readouterr().out
+
+
+def test_ledger_write_failure_stops_run_and_keeps_file_in_place(cfg, ledger, workdir, monkeypatch, caplog):
+    def broken_add(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(ledger, "add", broken_add)
+    drive = FakeDrive({"s": [f("s1", "a.mp4", "t1"), f("s2", "b.mp4", "t2")]})
+    uploader = FakeUploader()
+    with caplog.at_level("ERROR", logger="autopost"):
+        result = go(cfg, drive, uploader, ledger, workdir)
+
+    assert len(result.failed) == 1
+    job_failed, message = result.failed[0]
+    assert job_failed.file.id == "s1"
+    assert "yt1" in message and "disk full" in message
+    assert result.uploaded == []
+    assert len(uploader.bodies) == 1  # later jobs not uploaded
+    assert drive.moves == []
+    assert "yt1" in caplog.text and "a.mp4" in caplog.text
+
+
+def test_main_bad_config_returns_1_without_traceback(tmp_path, monkeypatch, raw_config):
+    import yaml
+
+    from autopost.main import main
+
+    raw_config["timezone"] = "Mars/Olympus"
+    bad = tmp_path / "config.yaml"
+    bad.write_text(yaml.safe_dump(raw_config), encoding="utf-8")
+    for name in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"):
+        monkeypatch.setenv(name, "dummy")
+
+    assert main(["--config", str(bad), "--ledger", str(tmp_path / "log.json")]) == 1
