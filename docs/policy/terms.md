@@ -1,11 +1,14 @@
-# Terms of Use: Autopost
+﻿---
+title: autopost - Terms of Service
+---
+# Terms of Service: autopost
 
-_Last updated: 2026-11-19_
+_Last updated: 2026-11-26_
 
-Autopost is a private tool operated by the channel owner for uploading the owner's own videos to the owner's own YouTube channel. It is not offered to the public.
+autopost is a private tool that uploads a channel owner's own videos to their own YouTube channel. It is not offered to the public.
 
-By using Autopost, the user agrees to the [YouTube Terms of Service](https://www.youtube.com/t/terms) and the [Google Privacy Policy](https://policies.google.com/privacy).
+By using autopost, the user agrees to the [YouTube Terms of Service](https://www.youtube.com/t/terms) and the [Google Privacy Policy](http://www.google.com/policies/privacy).
 
-The owner is responsible for having the rights to every video uploaded.
+The channel owner is responsible for having the rights to every video uploaded.
 
-Contact: CONTACT_EMAIL
+Contact: [github.com/bayezid-hossain](https://github.com/bayezid-hossain)

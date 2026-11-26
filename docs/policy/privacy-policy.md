@@ -1,24 +1,36 @@
-# Privacy Policy: Autopost
+---
+title: autopost - Privacy Policy
+---
+# Privacy Policy: autopost
 
-_Last updated: 2026-11-19_
+_Last updated: 2026-11-26_
 
-Autopost is a personal tool that uploads videos from the owner's Google Drive to the owner's own YouTube channel. It has one user: the channel owner.
-
-## What data it uses
-- **Google account access (OAuth):** read-only permission for Google Drive (to read the video queue folder) and to upload videos to YouTube. The OAuth refresh token and client credentials are stored only as encrypted GitHub Actions secrets in the owner's private repository.
-- **Video files:** downloaded from Drive to a temporary GitHub Actions runner, uploaded to YouTube, then deleted from the runner when the run ends.
-- **File names:** sent to the Google Gemini API to draft titles, descriptions and tags.
-- **Upload log:** Drive file IDs and YouTube video IDs are kept in the owner's private repository to prevent duplicate uploads.
-
-## What it does not do
-- It does not collect data from anyone other than the owner.
-- It does not sell, share or transfer data to third parties.
-- It does not use YouTube data for advertising or analytics.
+autopost is a private tool that uploads videos from a Google Drive folder to one YouTube channel, with the channel owner's permission. It is not offered to the public.
 
 ## YouTube API Services
-Autopost uses YouTube API Services. By using it you agree to the [YouTube Terms of Service](https://www.youtube.com/t/terms). See also the [Google Privacy Policy](https://policies.google.com/privacy).
+autopost uses **YouTube API Services**. By using autopost you agree to be bound by the [YouTube Terms of Service](https://www.youtube.com/t/terms). Google's handling of your data is described in the [Google Privacy Policy](http://www.google.com/policies/privacy).
 
-You can revoke Autopost's access at any time at [Google security settings](https://myaccount.google.com/permissions).
+## Data autopost accesses
+- **Google account access (OAuth 2.0):** permission to upload videos to the owner's YouTube channel (`youtube.upload`) and read-only access to Google Drive (`drive.readonly`) to read the video folder.
+- **Video files and file names** in the owner's Drive folder, and a text file with hashtags in that folder.
+
+## How the data is used
+- Video files are uploaded to the owner's own YouTube channel with `videos.insert`. Nothing else is read from YouTube.
+- File names are sent to the Google Gemini API to draft video titles and descriptions.
+- autopost does not use YouTube or Drive data for advertising, analytics, or any other purpose.
+
+## How the data is stored
+- The OAuth refresh token and client credentials are stored only as encrypted GitHub Actions secrets. They are never published.
+- Video files are downloaded to a temporary GitHub Actions runner, uploaded, and deleted from the runner when the run ends.
+- An upload log keeps only the Drive file ID and the YouTube video ID of each uploaded video, to prevent duplicate uploads. It is stored in the tool's code repository.
+- autopost uses no cookies and no tracking.
+
+## Sharing
+autopost does not sell, share or transfer data to any third party. It does not collect data from anyone other than the channel owner.
+
+## Revoking access and deleting data
+- The owner can revoke autopost's access at any time on the [Google security settings page](https://security.google.com/settings/security/permissions). After that, autopost can no longer access YouTube or Drive.
+- To delete stored data, contact the developer (below). The upload log, the stored credentials and any other stored data are deleted within 7 days of the request, or within 7 days of access being revoked.
 
 ## Contact
-CONTACT_EMAIL
+[github.com/bayezid-hossain](https://github.com/bayezid-hossain)
