@@ -12,7 +12,7 @@ import yaml
 
 MAX_DAILY_UPLOADS = 6  # YouTube free quota: 10,000 units/day, ~1,600 per upload
 EARLIEST_SLOT = time(6, 30)  # daily run starts 06:00 local and needs lead time
-PUBLISH_MODES = ("private", "scheduled")
+PUBLISH_MODES = ("private", "scheduled", "public")
 _HHMM = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
 

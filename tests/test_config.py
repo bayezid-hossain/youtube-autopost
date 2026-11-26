@@ -41,7 +41,7 @@ def test_bad_timezone_rejected(raw_config, tz):
 
 
 def test_bad_publish_mode_rejected(raw_config):
-    raw_config["publish_mode"] = "public"
+    raw_config["publish_mode"] = "live"
     with pytest.raises(ConfigError, match="publish_mode"):
         parse_config(raw_config)
 

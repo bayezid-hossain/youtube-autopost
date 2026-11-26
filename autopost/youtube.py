@@ -25,7 +25,8 @@ class QuotaExceeded(RuntimeError):
 
 
 def build_body(meta: Metadata, cfg: Config, publish_at: datetime) -> dict:
-    status = {"privacyStatus": "private", "selfDeclaredMadeForKids": cfg.made_for_kids}
+    privacy = "public" if cfg.publish_mode == "public" else "private"
+    status = {"privacyStatus": privacy, "selfDeclaredMadeForKids": cfg.made_for_kids}
     if cfg.publish_mode == "scheduled":
         status["publishAt"] = publish_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     return {

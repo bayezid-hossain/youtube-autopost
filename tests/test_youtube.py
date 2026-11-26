@@ -97,3 +97,13 @@ def test_transport_errors_exhaust_retries(video, sleeps):
     with pytest.raises(OSError):
         upload(service, video, {})
     assert len(sleeps) == RETRIES
+
+
+def test_public_mode_uploads_public_without_publish_at(cfg):
+    import dataclasses as dc
+    from datetime import datetime, timezone
+    from autopost.models import Metadata
+    from autopost.youtube import build_body
+    body = build_body(Metadata("t", "d", ()), dc.replace(cfg, publish_mode="public"), datetime(2026, 1, 1, tzinfo=timezone.utc))
+    assert body["status"]["privacyStatus"] == "public"
+    assert "publishAt" not in body["status"]
