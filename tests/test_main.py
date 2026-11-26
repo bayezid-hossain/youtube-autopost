@@ -256,3 +256,38 @@ def test_main_http_error_returns_1(tmp_path, monkeypatch, raw_config, caplog):
     with caplog.at_level("ERROR", logger="autopost"):
         assert main_module.main(["--config", str(path), "--ledger", str(tmp_path / "log.json")]) == 1
     assert "Google API error" in caplog.text
+
+
+def test_single_read_only_folder_with_hashtags(cfg, ledger, workdir):
+    import dataclasses
+
+    single = dataclasses.replace(
+        cfg,
+        short_slots=(),
+        queue_shorts_folder_id=None,
+        posted_folder_id=None,
+        hashtags_file="Hash_Tag.txt",
+    )
+    drive = FakeDrive(
+        {"v": [f("v1", "combo.mp4"), f("h", "Hash_Tag.txt")]},
+        texts={"h": "\\#gaming\n\\#mk11\nSome title\n"},
+    )
+    uploader = FakeUploader()
+    result = go(single, drive, uploader, ledger, workdir)
+
+    assert [job.file.id for job, _ in result.uploaded] == ["v1"]
+    body = uploader.bodies[0]
+    assert body["snippet"]["description"].endswith("#gaming #mk11")
+    assert "gaming" in body["snippet"]["tags"] and "mk11" in body["snippet"]["tags"]
+    assert drive.moves == []  # no posted folder: nothing is moved
+    assert ledger.has("v1")
+    assert result.queue_left == {"video": 0, "short": 0}
+
+
+def test_missing_hashtags_file_still_uploads(cfg, ledger, workdir):
+    import dataclasses
+
+    single = dataclasses.replace(cfg, short_slots=(), queue_shorts_folder_id=None, hashtags_file="Hash_Tag.txt")
+    drive = FakeDrive({"v": [f("v1", "combo.mp4")]})
+    result = go(single, drive, FakeUploader(), ledger, workdir)
+    assert [job.file.id for job, _ in result.uploaded] == ["v1"]

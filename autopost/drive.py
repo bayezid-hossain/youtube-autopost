@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from googleapiclient.http import MediaIoBaseDownload
@@ -13,11 +14,23 @@ SIDECAR_EXTENSIONS = frozenset({".json", ".txt"})
 DOWNLOAD_CHUNK = 50 * 1024 * 1024
 RETRIES = 3  # googleapiclient retries with exponential backoff
 
+# Recording time in file names, e.g. "Mortal Kombat 11 2025.12.02 - 22.31.14.26.Fatal Blow.DVR.mp4"
+_NAME_TIMESTAMP = re.compile(r"(\d{4})[.\-](\d{2})[.\-](\d{2})\D{1,5}(\d{2})[.\-:](\d{2})[.\-:](\d{2})")
+
+
+def _sequence_key(file: DriveFile) -> tuple[str, str]:
+    """Recording time from the name if present, else Drive modified time, else created time."""
+    match = _NAME_TIMESTAMP.search(file.name)
+    if match:
+        y, mo, d, h, mi, s = match.groups()
+        return f"{y}-{mo}-{d}T{h}:{mi}:{s}", file.name
+    return file.modified_time or file.created_time, file.name
+
 
 def split_listing(
     files: list[DriveFile],
 ) -> tuple[list[DriveFile], dict[str, list[DriveFile]]]:
-    """Return (videos oldest first, sidecars grouped by file stem). Other files are ignored."""
+    """Return (videos in recording order, sidecars grouped by file stem). Other files are ignored."""
     videos: list[DriveFile] = []
     sidecars: dict[str, list[DriveFile]] = {}
     for file in files:
@@ -27,7 +40,7 @@ def split_listing(
             videos.append(file)
         elif ext in SIDECAR_EXTENSIONS:
             sidecars.setdefault(stem, []).append(file)
-    videos.sort(key=lambda v: (v.created_time, v.name))
+    videos.sort(key=_sequence_key)
     return videos, sidecars
 
 
@@ -46,7 +59,7 @@ class Drive:
                         f"'{folder_id}' in parents and trashed = false"
                         " and mimeType != 'application/vnd.google-apps.folder'"
                     ),
-                    fields="nextPageToken, files(id, name, createdTime)",
+                    fields="nextPageToken, files(id, name, createdTime, modifiedTime)",
                     pageSize=1000,
                     pageToken=page_token,
                     supportsAllDrives=True,
@@ -55,7 +68,12 @@ class Drive:
                 .execute(num_retries=RETRIES)
             )
             files.extend(
-                DriveFile(id=item["id"], name=item["name"], created_time=item["createdTime"])
+                DriveFile(
+                    id=item["id"],
+                    name=item["name"],
+                    created_time=item["createdTime"],
+                    modified_time=item.get("modifiedTime", ""),
+                )
                 for item in response.get("files", [])
             )
             page_token = response.get("nextPageToken")

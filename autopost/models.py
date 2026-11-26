@@ -10,6 +10,7 @@ class DriveFile:
     id: str
     name: str
     created_time: str  # RFC 3339 string from Drive; sorts chronologically as text
+    modified_time: str = ""  # RFC 3339; survives re-uploads better than created_time
 
 
 @dataclass(frozen=True)

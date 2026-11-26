@@ -18,7 +18,7 @@ from autopost.auth import MissingSecret, credentials_from_env
 from autopost.config import Config, load_config
 from autopost.drive import Drive, split_listing
 from autopost.ledger import Ledger
-from autopost.metadata import Generator, build_metadata, pick_sidecar
+from autopost.metadata import Generator, build_metadata, parse_hashtags, pick_sidecar
 from autopost.models import DriveFile, Job
 from autopost.notify import send_telegram, write_step_summary
 from autopost.scheduler import plan_day
@@ -43,13 +43,30 @@ def _stem(file: DriveFile) -> str:
     return os.path.splitext(file.name)[0]
 
 
-def _queue_folder(cfg: Config, kind: str) -> str:
+def _queue_folder(cfg: Config, kind: str) -> Optional[str]:
     return cfg.queue_videos_folder_id if kind == "video" else cfg.queue_shorts_folder_id
 
 
-def _move_with_sidecars(drive, video: DriveFile, sidecars: list[DriveFile], src: str, dst: str) -> None:
+def _move_with_sidecars(drive, video: DriveFile, sidecars: list[DriveFile], src: str, dst: Optional[str]) -> None:
+    if dst is None:  # no posted folder configured: the ledger alone prevents re-uploads
+        return
     for file in [video, *sidecars]:
         drive.move(file.id, src, dst)
+
+
+def _load_hashtags(drive, cfg: Config, listings: list[list[DriveFile]]) -> list[str]:
+    if not cfg.hashtags_file:
+        return []
+    for files in listings:
+        for file in files:
+            if file.name == cfg.hashtags_file:
+                try:
+                    return parse_hashtags(drive.read_text(file.id))
+                except Exception as exc:
+                    log.warning("could not read hashtags file %s: %s", file.name, exc)
+                    return []
+    log.warning("hashtags file %s not found in the queue folder(s)", cfg.hashtags_file)
+    return []
 
 
 def _read_sidecar(drive, files: list[DriveFile]) -> Optional[tuple[str, str]]:
@@ -83,15 +100,21 @@ def run(
 ) -> RunResult:
     pending: dict[str, list[DriveFile]] = {}
     sidecars: dict[str, dict[str, list[DriveFile]]] = {}
+    listings: list[list[DriveFile]] = []
     for kind in KINDS:
         folder = _queue_folder(cfg, kind)
-        videos, sidecars[kind] = split_listing(drive.list_folder(folder))
         pending[kind] = []
+        sidecars[kind] = {}
+        if folder is None:
+            continue
+        listing = drive.list_folder(folder)
+        listings.append(listing)
+        videos, sidecars[kind] = split_listing(listing)
         for video in videos:
             if not ledger.has(video.id):
                 pending[kind].append(video)
                 continue
-            if dry_run:
+            if dry_run or cfg.posted_folder_id is None:
                 continue
             # uploaded on an earlier run but the move failed: retry the move only
             try:
@@ -99,6 +122,7 @@ def run(
             except Exception as exc:
                 log.warning("could not move already-posted %s: %s", video.name, exc)
 
+    hashtags = _load_hashtags(drive, cfg, listings)
     today = now.astimezone(cfg.timezone).date()
     result = RunResult(planned=plan_day(today, now, cfg, pending["video"], pending["short"]))
 
@@ -106,7 +130,7 @@ def run(
         stem = _stem(job.file)
         folder = _queue_folder(cfg, job.kind)
         side_files = sidecars[job.kind].get(stem, [])
-        meta = build_metadata(stem, job.kind, _read_sidecar(drive, side_files), generate, cfg)
+        meta = build_metadata(stem, job.kind, _read_sidecar(drive, side_files), generate, cfg, hashtags)
         if dry_run:
             log.info("[dry-run] %s %s at %s -> %r", job.kind, job.file.name, job.publish_at.isoformat(), meta.title)
             continue
@@ -193,7 +217,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         cfg = load_config(args.config)
         folder_ids = (cfg.queue_videos_folder_id, cfg.queue_shorts_folder_id, cfg.posted_folder_id)
-        if any(folder_id.startswith("REPLACE_WITH_") for folder_id in folder_ids):
+        if any(folder_id and folder_id.startswith("REPLACE_WITH_") for folder_id in folder_ids):
             log.error("config.yaml still has placeholder Drive folder IDs; set drive.* to your real folder IDs")
             return 1
         creds = credentials_from_env()

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 from autopost.config import Config
 from autopost.models import DriveFile, Metadata
@@ -47,6 +47,30 @@ def parse_sidecar(name: str, text: str) -> dict:
     if description:
         out["description"] = description
     return out
+
+
+_HASHTAG = re.compile(r"#(\w+)")
+DESCRIPTION_HASHTAGS_MAX = 15  # YouTube ignores ALL hashtags in a description that has more than 15
+
+
+def parse_hashtags(text: str) -> list[str]:
+    """Every #tag in the text, first occurrence wins, case-insensitive. Other lines are ignored."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for word in _HASHTAG.findall(text.replace("\\#", "#")):
+        if word.lower() not in seen:
+            seen.add(word.lower())
+            out.append(f"#{word}")
+    return out
+
+
+def _append_hashtags(description: str, hashtags: list[str]) -> str:
+    present = {tag.lower() for tag in parse_hashtags(description)}
+    room = max(0, DESCRIPTION_HASHTAGS_MAX - len(present))
+    new = [tag for tag in hashtags if tag.lower() not in present][:room]
+    if not new:
+        return description
+    return f"{description}\n\n{' '.join(new)}".strip()
 
 
 def pick_sidecar(files: list[DriveFile]) -> Optional[DriveFile]:
@@ -95,16 +119,16 @@ def _truncate_bytes(text: str, limit: int) -> str:
     return text.encode("utf-8")[:limit].decode("utf-8", "ignore")
 
 
-def finalize(meta: dict, kind: str) -> Metadata:
+def finalize(meta: dict, kind: str, hashtags: Sequence[str] = ()) -> Metadata:
     title = _strip_angles(meta["title"]).strip()[:TITLE_MAX].strip() or "Untitled"
-    description = _strip_angles(meta["description"]).strip()
+    description = _append_hashtags(_strip_angles(meta["description"]).strip(), list(hashtags))
     if kind == "short" and SHORTS_TAG.lower() not in description.lower():
         room = DESCRIPTION_MAX - len(("\n\n" + SHORTS_TAG).encode("utf-8"))
         description = f"{_truncate_bytes(description, room)}\n\n{SHORTS_TAG}".strip()
     return Metadata(
         title=title,
         description=_truncate_bytes(description, DESCRIPTION_MAX),
-        tags=_fit_tags(meta["tags"]),
+        tags=_fit_tags(list(meta["tags"]) + [tag.lstrip("#") for tag in hashtags]),
     )
 
 
@@ -114,8 +138,9 @@ def build_metadata(
     sidecar: Optional[tuple[str, str]],
     generate: Optional[Generator],
     cfg: Config,
+    hashtags: Sequence[str] = (),
 ) -> Metadata:
-    """sidecar is (file name, file text) or None."""
+    """sidecar is (file name, file text) or None. hashtags are appended to every description."""
     meta: dict = {}
     if sidecar is not None:
         name, text = sidecar
@@ -137,4 +162,4 @@ def build_metadata(
     defaults = fallback(stem, cfg)
     for key in FIELDS:
         meta.setdefault(key, defaults[key])
-    return finalize(meta, kind)
+    return finalize(meta, kind, hashtags)

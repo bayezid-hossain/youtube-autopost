@@ -79,9 +79,33 @@ def test_slot_too_early_rejected(raw_config, slot):
         parse_config(raw_config)
 
 
-def test_missing_drive_folder_rejected(raw_config):
+def test_queue_folder_required_for_kind_with_slots(raw_config):
+    del raw_config["drive"]["queue_videos_folder_id"]
+    with pytest.raises(ConfigError, match="drive.queue_videos_folder_id"):
+        parse_config(raw_config)
+
+
+def test_queue_folder_optional_for_kind_without_slots(raw_config):
+    raw_config["slots"] = {"videos": ["08:45", "15:15", "21:00"]}
+    del raw_config["drive"]["queue_shorts_folder_id"]
+    cfg = parse_config(raw_config)
+    assert cfg.queue_shorts_folder_id is None
+
+
+def test_posted_folder_optional(raw_config):
     del raw_config["drive"]["posted_folder_id"]
-    with pytest.raises(ConfigError, match="drive.posted_folder_id"):
+    assert parse_config(raw_config).posted_folder_id is None
+
+
+def test_hashtags_file(raw_config):
+    assert parse_config(raw_config).hashtags_file is None
+    raw_config["hashtags_file"] = "Hash_Tag.txt"
+    assert parse_config(raw_config).hashtags_file == "Hash_Tag.txt"
+
+
+def test_hashtags_file_must_be_string(raw_config):
+    raw_config["hashtags_file"] = ["a"]
+    with pytest.raises(ConfigError, match="hashtags_file"):
         parse_config(raw_config)
 
 

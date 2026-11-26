@@ -3,21 +3,24 @@
 timezone: Asia/Dhaka            # your channel's IANA timezone
 publish_mode: private           # private = upload as private drafts (before API audit)
                                 # scheduled = private + auto-publish at slot time (after audit)
-daily_cap: 6                    # 1..6 (YouTube free API quota allows ~6 uploads/day)
+daily_cap: 3                    # 1..6 (YouTube free API quota allows ~6 uploads/day)
 
 slots:                          # each slot must be later than 06:30; total slots <= daily_cap
-  videos: ["18:00"]
-  shorts: ["10:00", "13:00", "16:00", "20:00", "22:00"]
+  videos: ["08:45", "15:15", "21:00"]
 
 drive:                          # folder ID = the last part of the folder's URL in Drive
-  queue_videos_folder_id: "12rOHLIn35YVSp47uHBhXWPIFWxlHuLEU"
-  queue_shorts_folder_id: "1jmvqII9gvGg_1vxx45uvhyvfeiH2BUlr"
-  posted_folder_id: "1I7wL6Dr65DuqDOC4w-e-DFuC5Hp_hL2d"
+  queue_videos_folder_id: "12mq0P2FdznoCJDOt9w6cjwY9UIP9ycv8"   # shared folder (read-only)
+  # queue_shorts_folder_id: only needed if slots.shorts is set
+  # posted_folder_id: omitted -> files are never moved; posted_log.json prevents re-uploads
+
+# Hashtag list inside the queue folder. First 15 go in each description
+# (YouTube ignores all hashtags if a description has more than 15); all become tags.
+hashtags_file: Hash_Tag.txt
 
 defaults:                       # used when no sidecar and Gemini is unavailable; description is also given to Gemini as channel context
-  description: ""
-  tags: []
-  category_id: "22"             # 22 = People & Blogs
+  description: "Mortal Kombat 11 gameplay clips: fatal blows, killing blows, fatalities and combos."
+  tags: ["Mortal Kombat 11", "MK11", "gaming"]
+  category_id: "20"             # 20 = Gaming
   made_for_kids: false
 
 gemini_model: gemini-flash-latest

@@ -7,7 +7,7 @@ PROMPT = """You write metadata for a YouTube {label}.
 Base it only on the file name below. Do not invent specific facts the file name does not suggest.
 Return only JSON with these keys:
 - "title": catchy, max 90 characters, no all-caps clickbait
-- "description": 2-4 short paragraphs, max 1500 characters
+- "description": 2-4 short paragraphs, max 1500 characters, no hashtags (they are added separately)
 - "tags": list of 8-15 short search tags
 
 File name: {stem}

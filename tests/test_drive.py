@@ -22,6 +22,28 @@ def test_split_listing_separates_videos_and_sidecars():
     assert "notes" not in sidecars
 
 
+def test_split_listing_orders_by_recording_time_in_name_then_modified_time():
+    files = [
+        # batch-uploaded: created_time order is meaningless
+        DriveFile("late", "MK 2025.12.02 - 22.31.14.26.Fatal Blow.DVR.mp4", "2026-11-18T14:54:30Z", "2025-12-13T16:01:01Z"),
+        DriveFile("early", "MK 2025.12.02 - 22.05.55.02.Killing Blow.DVR.mp4", "2026-11-18T14:53:07Z", "2025-12-13T15:27:58Z"),
+        DriveFile("mid", "MK 2025.12.02 - 22.10.01.06.Killing Blow.DVR.mp4", "2026-11-18T14:53:17Z", "2025-12-07T16:27:28Z"),
+        DriveFile("nostamp", "BLOOD STORM OF BARAKA.mp4", "2026-11-18T14:52:36Z", "2025-12-07T16:50:30Z"),
+        DriveFile("oldest", "MK 2025.11.05 - 20.14.14.31.Killing Blow.DVR.mp4", "2026-11-18T14:52:40Z", "2025-11-13T16:31:10Z"),
+    ]
+    videos, _ = split_listing(files)
+    assert [v.id for v in videos] == ["oldest", "early", "mid", "late", "nostamp"]
+
+
+def test_list_folder_reads_modified_time():
+    service = MagicMock()
+    service.files.return_value.list.return_value.execute.return_value = {
+        "files": [{"id": "1", "name": "a.mp4", "createdTime": "c", "modifiedTime": "m"}]
+    }
+    assert Drive(service).list_folder("x") == [DriveFile("1", "a.mp4", "c", "m")]
+    assert "modifiedTime" in service.files.return_value.list.call_args.kwargs["fields"]
+
+
 def test_list_folder_follows_pages():
     service = MagicMock()
     service.files.return_value.list.return_value.execute.side_effect = [

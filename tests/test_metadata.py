@@ -4,9 +4,37 @@ from autopost.metadata import (
     build_metadata,
     clean_title,
     finalize,
+    parse_hashtags,
     parse_sidecar,
     pick_sidecar,
 )
+
+
+# --- hashtags ---
+
+HASHTAG_FILE = "\\#gaming  \n\\#videogames  \n#Gaming\n\nSome title line\n#mk11 #subzero\n"
+
+
+def test_parse_hashtags_dedupes_case_insensitively_and_ignores_text():
+    assert parse_hashtags(HASHTAG_FILE) == ["#gaming", "#videogames", "#mk11", "#subzero"]
+
+
+def test_finalize_appends_hashtags_and_adds_them_as_tags():
+    meta = finalize({"title": "t", "description": "Nice combo", "tags": ["mk"]}, "video", hashtags=["#gaming", "#mk11"])
+    assert meta.description == "Nice combo\n\n#gaming #mk11"
+    assert meta.tags == ("mk", "gaming", "mk11")
+
+
+def test_finalize_caps_description_hashtags_at_15():
+    tags = [f"#t{i}" for i in range(22)]
+    meta = finalize({"title": "t", "description": "d #already", "tags": []}, "video", hashtags=tags)
+    assert len([w for w in meta.description.split() if w.startswith("#")]) == 15
+    assert len(meta.tags) == 22  # every hashtag still becomes a tag
+
+
+def test_finalize_skips_hashtags_already_in_description():
+    meta = finalize({"title": "t", "description": "d #Gaming", "tags": []}, "video", hashtags=["#gaming", "#mk11"])
+    assert meta.description == "d #Gaming\n\n#mk11"
 from autopost.models import DriveFile
 
 
