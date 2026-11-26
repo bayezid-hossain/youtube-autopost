@@ -18,7 +18,7 @@ Every morning a GitHub Actions job takes the next files from your Drive queue fo
 ## One-time setup (≈45 min, all free)
 
 1. **Google Cloud project:** at https://console.cloud.google.com create a project. Under *APIs & Services → Library*, enable **YouTube Data API v3** and **Google Drive API**.
-2. **OAuth consent screen:** User type *External*. Add scopes `.../auth/youtube.upload` and `.../auth/drive`. Add your channel's Google account as a test user. Then click **Publish app** so the status is **In production** (otherwise the token expires every 7 days). You will see an "unverified app" warning when signing in; click *Advanced → Go to app*. That's fine for a single-user tool.
+2. **OAuth consent screen:** User type *External*. Add scopes `.../auth/youtube.upload` and `.../auth/drive.readonly` (read-only; if you use `posted_folder_id`, use `.../auth/drive` instead and edit `SCOPES` in `autopost/auth.py`). Add your channel's Google account as a test user. Then click **Publish app** so the status is **In production** (otherwise the token expires every 7 days). You will see an "unverified app" warning when signing in; click *Advanced → Go to app*. That's fine for a single-user tool.
 3. **OAuth client:** *Credentials → Create credentials → OAuth client ID → Desktop app*. Download the JSON as `client_secret.json` into this folder (it's gitignored).
 4. **Refresh token:**
    ```powershell

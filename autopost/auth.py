@@ -8,7 +8,7 @@ from google.oauth2.credentials import Credentials
 
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
-    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.readonly",  # read the queue folder only; moving to posted/ needs .../auth/drive
 ]
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 REQUIRED = ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN")
