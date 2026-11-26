@@ -6,7 +6,7 @@ publish_mode: scheduled         # scheduled = upload private, YouTube auto-publi
 daily_cap: 3                    # 1..6 (YouTube free API quota allows ~6 uploads/day)
 
 slots:                          # each slot must be later than 06:30; total slots <= daily_cap
-  videos: ["17:10"]  # TEMP test slot
+  videos: ["08:45", "15:15", "21:00"]
 
 drive:                          # folder ID = the last part of the folder's URL in Drive
   queue_videos_folder_id: "12mq0P2FdznoCJDOt9w6cjwY9UIP9ycv8"   # shared folder (read-only)
