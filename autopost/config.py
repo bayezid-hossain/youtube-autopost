@@ -138,7 +138,7 @@ def parse_config(raw: dict) -> Config:
         default_tags=tuple(str(t) for t in tags),
         category_id=str(defaults.get("category_id", "22")),
         made_for_kids=made_for_kids,
-        gemini_model=str(raw.get("gemini_model") or "gemini-flash-latest"),
+        gemini_model=str(raw.get("gemini_model") or "gemini-3.8-flash"),
         hashtags_file=hashtags_file or None,
     )
 

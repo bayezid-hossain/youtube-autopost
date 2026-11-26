@@ -30,7 +30,7 @@ def test_defaults_when_optional_keys_missing(raw_config):
     assert cfg.default_description == ""
     assert cfg.default_tags == ()
     assert cfg.category_id == "22"
-    assert cfg.gemini_model == "gemini-flash-latest"
+    assert cfg.gemini_model == "gemini-3.8-flash"
 
 
 @pytest.mark.parametrize("tz", [None, "", "Mars/Olympus"])
@@ -157,7 +157,7 @@ def test_null_description_and_model_use_defaults(raw_config):
     raw_config["gemini_model"] = None
     cfg = parse_config(raw_config)
     assert cfg.default_description == ""
-    assert cfg.gemini_model == "gemini-flash-latest"
+    assert cfg.gemini_model == "gemini-3.8-flash"
 
 
 @pytest.mark.parametrize("slots", ["18:00", ["18:00"]])
