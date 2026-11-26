@@ -291,3 +291,52 @@ def test_missing_hashtags_file_still_uploads(cfg, ledger, workdir):
     drive = FakeDrive({"v": [f("v1", "combo.mp4")]})
     result = go(single, drive, FakeUploader(), ledger, workdir)
     assert [job.file.id for job, _ in result.uploaded] == ["v1"]
+
+
+def test_format_queue_lists_remaining_files_with_expected_publish_times(cfg):
+    import dataclasses as dc
+    from datetime import datetime, time
+
+    from autopost.main import RunResult, format_queue
+    from autopost.models import DriveFile
+
+    cfg = dc.replace(cfg, video_slots=(time(9, 0), time(18, 0)), short_slots=(), daily_cap=2)
+    files = [
+        DriveFile("a", "first.mp4", "2026-11-18T14:52:36Z"),
+        DriveFile("b", "sec|ond.mp4", "2026-11-18T14:52:40Z"),
+        DriveFile("c", "third.mp4", "2026-11-18T14:52:44Z"),
+    ]
+    result = RunResult(remaining={"video": files, "short": []})
+    now = datetime(2026, 11, 26, 12, 0, tzinfo=cfg.timezone)
+    text = format_queue(result, cfg, now, dry_run=True)
+    rows = [line for line in text.splitlines() if line.startswith("| ") and line[2].isdigit()]
+    assert len(rows) == 3
+    assert "first.mp4" in rows[0] and "2026-11-26 18:00" in rows[0]
+    assert "sec\|ond.mp4" in rows[1] and "2026-11-27 09:00" in rows[1]
+    assert "third.mp4" in rows[2] and "2026-11-27 18:00" in rows[2]
+
+
+def test_format_queue_after_real_run_starts_tomorrow(cfg):
+    import dataclasses as dc
+    from datetime import datetime, time, timezone
+
+    from autopost.main import RunResult, format_queue
+    from autopost.models import DriveFile, Job
+
+    cfg = dc.replace(cfg, video_slots=(time(18, 0),), short_slots=(), daily_cap=1)
+    done = DriveFile("x", "done.mp4", "t")
+    nxt = DriveFile("a", "next.mp4", "2026-11-18T14:52:36Z")
+    planned = [Job("video", done, datetime(2026, 11, 26, 12, 0, tzinfo=timezone.utc))]
+    result = RunResult(planned=planned, uploaded=[(planned[0], "vid")], remaining={"video": [nxt], "short": []})
+    now = datetime(2026, 11, 26, 6, 7, tzinfo=cfg.timezone)
+    text = format_queue(result, cfg, now, dry_run=False)
+    assert "2026-11-27 18:00" in text and "done.mp4" not in text
+
+
+def test_format_queue_empty(cfg):
+    from datetime import datetime, timezone
+
+    from autopost.main import RunResult, format_queue
+
+    text = format_queue(RunResult(remaining={"video": [], "short": []}), cfg, datetime.now(timezone.utc), True)
+    assert "Queue empty" in text

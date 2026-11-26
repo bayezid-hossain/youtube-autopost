@@ -3,10 +3,10 @@
 Every morning a GitHub Actions job takes the next files from your Drive queue folders and uploads them to YouTube for today's time slots (max 6 per day).
 
 - `queue/videos/` → regular videos, `queue/shorts/` → Shorts. Only folders for kinds that have slots are needed; a shared read-only folder works.
-- Upload order: recording time in the file name (e.g. `2025.12.02 - 22.31.14`), else the file's Drive modified time.
+- Upload order: first come, first served by the time each file was added to Drive. `QUEUE.md` in the repo lists every queued file with its expected publish time; it is refreshed after every run.
 - Optional `hashtags_file` (e.g. `Hash_Tag.txt` in the queue folder): every `#tag` in it is added to each video. Max 15 go in the description (YouTube ignores all hashtags beyond 15); all of them go in tags.
 - Optional sidecar next to a video: `my-video.json` (`{"title": ..., "description": ..., "tags": [...]}`) or `my-video.txt` (line 1 = title, rest = description). Missing fields are written by Gemini from the file name; if Gemini fails, defaults from `config.yaml` are used.
-- If `posted_folder_id` is set, the video and its sidecar move to `posted/` after upload. Either way `posted_log.json` prevents duplicates. Never delete or reset `posted_log.json`, or everything uploads again.
+- After upload a file stays in Drive (unless `posted_folder_id` is set, then it moves to `posted/`). Its ID goes into `posted_log.json`, so it is never uploaded again; the owner may delete it from Drive. Never delete or reset `posted_log.json`, or everything uploads again.
 
 ## Modes
 

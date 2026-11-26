@@ -22,17 +22,16 @@ def test_split_listing_separates_videos_and_sidecars():
     assert "notes" not in sidecars
 
 
-def test_split_listing_orders_by_recording_time_in_name_then_modified_time():
+def test_split_listing_orders_by_drive_upload_time_then_name():
     files = [
-        # batch-uploaded: created_time order is meaningless
         DriveFile("late", "MK 2025.12.02 - 22.31.14.26.Fatal Blow.DVR.mp4", "2026-11-18T14:54:30Z", "2025-12-13T16:01:01Z"),
-        DriveFile("early", "MK 2025.12.02 - 22.05.55.02.Killing Blow.DVR.mp4", "2026-11-18T14:53:07Z", "2025-12-13T15:27:58Z"),
-        DriveFile("mid", "MK 2025.12.02 - 22.10.01.06.Killing Blow.DVR.mp4", "2026-11-18T14:53:17Z", "2025-12-07T16:27:28Z"),
-        DriveFile("nostamp", "BLOOD STORM OF BARAKA.mp4", "2026-11-18T14:52:36Z", "2025-12-07T16:50:30Z"),
-        DriveFile("oldest", "MK 2025.11.05 - 20.14.14.31.Killing Blow.DVR.mp4", "2026-11-18T14:52:40Z", "2025-11-13T16:31:10Z"),
+        DriveFile("early", "MK 2025.11.05 - 20.14.14.31.Killing Blow.DVR.mp4", "2026-11-18T14:52:40Z", "2025-11-13T16:31:10Z"),
+        DriveFile("first", "BLOOD STORM OF BARAKA.mp4", "2026-11-18T14:52:36Z", "2025-12-07T16:50:30Z"),
+        DriveFile("tie-b", "b.mp4", "2026-11-18T14:53:00Z"),
+        DriveFile("tie-a", "a.mp4", "2026-11-18T14:53:00Z"),
     ]
     videos, _ = split_listing(files)
-    assert [v.id for v in videos] == ["oldest", "early", "mid", "late", "nostamp"]
+    assert [v.id for v in videos] == ["first", "early", "tie-a", "tie-b", "late"]
 
 
 def test_list_folder_reads_modified_time():

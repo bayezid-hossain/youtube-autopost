@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 
 from googleapiclient.http import MediaIoBaseDownload
@@ -15,22 +14,17 @@ DOWNLOAD_CHUNK = 50 * 1024 * 1024
 RETRIES = 3  # googleapiclient retries with exponential backoff
 
 # Recording time in file names, e.g. "Mortal Kombat 11 2025.12.02 - 22.31.14.26.Fatal Blow.DVR.mp4"
-_NAME_TIMESTAMP = re.compile(r"(\d{4})[.\-](\d{2})[.\-](\d{2})\D{1,5}(\d{2})[.\-:](\d{2})[.\-:](\d{2})")
 
 
 def _sequence_key(file: DriveFile) -> tuple[str, str]:
-    """Recording time from the name if present, else Drive modified time, else created time."""
-    match = _NAME_TIMESTAMP.search(file.name)
-    if match:
-        y, mo, d, h, mi, s = match.groups()
-        return f"{y}-{mo}-{d}T{h}:{mi}:{s}", file.name
-    return file.modified_time or file.created_time, file.name
+    """First come, first served: Drive upload (created) time, then name for ties."""
+    return file.created_time or file.modified_time, file.name
 
 
 def split_listing(
     files: list[DriveFile],
 ) -> tuple[list[DriveFile], dict[str, list[DriveFile]]]:
-    """Return (videos in recording order, sidecars grouped by file stem). Other files are ignored."""
+    """Return (videos in Drive upload order, sidecars grouped by file stem). Other files are ignored."""
     videos: list[DriveFile] = []
     sidecars: dict[str, list[DriveFile]] = {}
     for file in files:

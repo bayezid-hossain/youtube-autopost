@@ -60,3 +60,29 @@ def test_publish_at_respects_dst(cfg, day, expected_utc_hour):
     assert [j.publish_at for j in jobs] == [
         datetime(day.year, day.month, day.day, expected_utc_hour, tzinfo=timezone.utc)
     ]
+
+
+def test_project_queue_spreads_files_over_following_days(cfg):
+    from autopost.scheduler import project_queue
+
+    cfg = dataclasses.replace(cfg, video_slots=(time(9, 0), time(18, 0)), short_slots=(), daily_cap=2)
+    tz = cfg.timezone
+    files = [DriveFile(str(i), f"{i}.mp4", f"2026-11-0{i}T00:00:00Z") for i in range(1, 6)]
+    now = datetime(2026, 11, 26, 12, 0, tzinfo=tz)  # 09:00 already passed today
+    jobs = project_queue(date(2026, 11, 26), now, cfg, files, [])
+    got = [(j.file.id, j.publish_at.astimezone(tz).strftime("%m-%d %H:%M")) for j in jobs]
+    assert got == [
+        ("1", "11-26 18:00"),
+        ("2", "11-27 09:00"),
+        ("3", "11-27 18:00"),
+        ("4", "11-28 09:00"),
+        ("5", "11-28 18:00"),
+    ]
+
+
+def test_project_queue_without_slots_returns_nothing(cfg):
+    from autopost.scheduler import project_queue
+
+    cfg = dataclasses.replace(cfg, video_slots=(), short_slots=())
+    now = datetime(2026, 11, 26, 12, 0, tzinfo=timezone.utc)
+    assert project_queue(date(2026, 11, 26), now, cfg, [DriveFile("1", "a.mp4", "t")], [], max_days=5) == []

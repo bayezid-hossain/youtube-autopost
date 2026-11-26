@@ -6,7 +6,7 @@ import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -21,7 +21,7 @@ from autopost.ledger import Ledger
 from autopost.metadata import Generator, build_metadata, parse_hashtags, pick_sidecar
 from autopost.models import DriveFile, Job
 from autopost.notify import send_telegram, write_step_summary
-from autopost.scheduler import plan_day
+from autopost.scheduler import plan_day, project_queue
 from autopost.youtube import QuotaExceeded, build_body, upload
 
 log = logging.getLogger("autopost")
@@ -37,6 +37,7 @@ class RunResult:
     failed: list[tuple[Job, str]] = field(default_factory=list)
     quota_hit: bool = False
     queue_left: dict[str, int] = field(default_factory=dict)
+    remaining: dict[str, list[DriveFile]] = field(default_factory=dict)
 
 
 def _stem(file: DriveFile) -> str:
@@ -170,7 +171,45 @@ def run(
 
     done = {kind: sum(1 for job, _ in result.uploaded if job.kind == kind) for kind in KINDS}
     result.queue_left = {kind: len(pending[kind]) - done[kind] for kind in KINDS}
+    uploaded_ids = {job.file.id for job, _ in result.uploaded}
+    result.remaining = {kind: [f for f in pending[kind] if f.id not in uploaded_ids] for kind in KINDS}
     return result
+
+
+def format_queue(result: RunResult, cfg: Config, now: datetime, dry_run: bool) -> str:
+    """Markdown list of every queued file with its expected publish time (first come, first served)."""
+    today = now.astimezone(cfg.timezone).date()
+    # a real run has used today's remaining slots, so the rest of the queue starts tomorrow
+    start = today if dry_run or not result.planned else today + timedelta(days=1)
+    jobs = project_queue(start, now, cfg, result.remaining.get("video", []), result.remaining.get("short", []))
+    scheduled = {job.file.id: job for job in jobs}
+    lines = [
+        "# Upload queue",
+        "",
+        f"Updated {now.astimezone(cfg.timezone):%Y-%m-%d %H:%M} ({cfg.timezone.key}). "
+        "Order: Drive upload time, first come first served. Times are estimates.",
+        "",
+        "| # | File | Added to Drive | Expected publish |",
+        "|---|---|---|---|",
+    ]
+    files = result.remaining.get("video", []) + result.remaining.get("short", [])
+    files.sort(key=lambda f: scheduled[f.id].publish_at if f.id in scheduled else datetime.max.replace(tzinfo=timezone.utc))
+    for i, file in enumerate(files, 1):
+        added = _local(file.created_time, cfg)
+        job = scheduled.get(file.id)
+        when = f"{job.publish_at.astimezone(cfg.timezone):%Y-%m-%d %H:%M}" if job else "no slot configured"
+        name = file.name.replace("|", "\\|")
+        lines.append(f"| {i} | {name} | {added} | {when} |")
+    if not files:
+        lines.append("| - | Queue empty: add videos to the Drive folder. | | |")
+    return "\n".join(lines) + "\n"
+
+
+def _local(rfc3339: str, cfg: Config) -> str:
+    try:
+        return f"{datetime.fromisoformat(rfc3339.replace('Z', '+00:00')).astimezone(cfg.timezone):%Y-%m-%d %H:%M}"
+    except ValueError:
+        return rfc3339 or "?"
 
 
 def format_summary(result: RunResult, dry_run: bool) -> str:
@@ -211,6 +250,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="plan and generate metadata only; upload nothing")
     parser.add_argument("--config", default="config.yaml", help="path to config.yaml")
     parser.add_argument("--ledger", default="posted_log.json", help="path to posted_log.json")
+    parser.add_argument("--queue-file", default="QUEUE.md", help="where to write the upload queue")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -224,13 +264,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         drive = Drive(build("drive", "v3", credentials=creds, cache_discovery=False))
         youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
         with tempfile.TemporaryDirectory() as tmp:
+            started = datetime.now(timezone.utc)
             result = run(
                 cfg,
                 drive,
                 lambda path, body: upload(youtube, path, body),
                 Ledger(args.ledger),
                 _make_generator(cfg),
-                datetime.now(timezone.utc),
+                started,
                 args.dry_run,
                 Path(tmp),
             )
@@ -248,6 +289,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     except (ValueError, OSError) as exc:
         log.error("%s", exc)
         return 1
+
+    try:
+        Path(args.queue_file).write_text(format_queue(result, cfg, started, args.dry_run), encoding="utf-8")
+    except OSError as exc:
+        log.warning("could not write %s: %s", args.queue_file, exc)
 
     text = format_summary(result, args.dry_run)
     print(text)

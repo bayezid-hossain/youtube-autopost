@@ -51,11 +51,11 @@ jobs:
         run: |
           git config user.name "autopost-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add posted_log.json
+          git add posted_log.json QUEUE.md
           git diff --cached --quiet && exit 0
-          git commit -m "chore: update posted log [skip ci]"
+          git commit -m "chore: update posted log and queue [skip ci]"
           for i in 1 2 3; do
             git pull --rebase origin "${{ github.ref_name }}" && git push origin "HEAD:${{ github.ref_name }}" && exit 0
             sleep $((i * 5))
           done
-          echo "::error::could not push posted_log.json"; exit 1
+          echo "::error::could not push posted_log.json and QUEUE.md"; exit 1
