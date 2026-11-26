@@ -307,13 +307,18 @@ def test_format_queue_lists_remaining_files_with_expected_publish_times(cfg):
         DriveFile("c", "third.mp4", "2026-11-18T14:52:44Z"),
     ]
     result = RunResult(remaining={"video": files, "short": []})
-    now = datetime(2026, 11, 26, 12, 0, tzinfo=cfg.timezone)
-    text = format_queue(result, cfg, now, dry_run=True)
+    early = datetime(2026, 11, 26, 6, 0, tzinfo=cfg.timezone)  # before the morning run: today counts
+    text = format_queue(result, cfg, early, dry_run=True)
     rows = [line for line in text.splitlines() if line.startswith("| ") and line[2].isdigit()]
     assert len(rows) == 3
-    assert "first.mp4" in rows[0] and "2026-11-26 18:00" in rows[0]
-    assert "sec\|ond.mp4" in rows[1] and "2026-11-27 09:00" in rows[1]
-    assert "third.mp4" in rows[2] and "2026-11-27 18:00" in rows[2]
+    assert "first.mp4" in rows[0] and "2026-11-26 09:00" in rows[0]
+    assert "sec\|ond.mp4" in rows[1] and "2026-11-26 18:00" in rows[1]
+    assert "third.mp4" in rows[2] and "2026-11-27 09:00" in rows[2]
+
+    afternoon = datetime(2026, 11, 26, 17, 0, tzinfo=cfg.timezone)  # no run left today: starts tomorrow
+    text = format_queue(result, cfg, afternoon, dry_run=True)
+    assert text.index("first.mp4") < text.index("2026-11-27 09:00")
+    assert "2026-11-26" not in text.split("|---|")[1]
 
 
 def test_format_queue_after_real_run_starts_tomorrow(cfg):

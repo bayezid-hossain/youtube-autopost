@@ -6,7 +6,7 @@ import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -26,6 +26,7 @@ from autopost.youtube import QuotaExceeded, build_body, upload
 
 log = logging.getLogger("autopost")
 KINDS = ("video", "short")
+MORNING_RUN_DEADLINE = time(6, 30)
 
 Uploader = Callable[[Path, dict], str]
 
@@ -178,9 +179,12 @@ def run(
 
 def format_queue(result: RunResult, cfg: Config, now: datetime, dry_run: bool) -> str:
     """Markdown list of every queued file with its expected publish time (first come, first served)."""
-    today = now.astimezone(cfg.timezone).date()
-    # a real run has used today's remaining slots, so the rest of the queue starts tomorrow
-    start = today if dry_run or not result.planned else today + timedelta(days=1)
+    local = now.astimezone(cfg.timezone)
+    today = local.date()
+    # Uploads only happen in the daily morning run (before 06:30, the earliest allowed slot).
+    # After a real run, or any time after the morning run, the rest of the queue starts tomorrow.
+    used_today = not dry_run and bool(result.planned)
+    start = today if not used_today and local.time() < MORNING_RUN_DEADLINE else today + timedelta(days=1)
     jobs = project_queue(start, now, cfg, result.remaining.get("video", []), result.remaining.get("short", []))
     scheduled = {job.file.id: job for job in jobs}
     lines = [
