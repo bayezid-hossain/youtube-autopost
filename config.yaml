@@ -10,9 +10,9 @@ slots:                          # each slot must be later than 06:30; total slot
   shorts: ["10:00", "13:00", "16:00", "20:00", "22:00"]
 
 drive:                          # folder ID = the last part of the folder's URL in Drive
-  queue_videos_folder_id: "REPLACE_WITH_QUEUE_VIDEOS_FOLDER_ID"
-  queue_shorts_folder_id: "REPLACE_WITH_QUEUE_SHORTS_FOLDER_ID"
-  posted_folder_id: "REPLACE_WITH_POSTED_FOLDER_ID"
+  queue_videos_folder_id: "12rOHLIn35YVSp47uHBhXWPIFWxlHuLEU"
+  queue_shorts_folder_id: "1jmvqII9gvGg_1vxx45uvhyvfeiH2BUlr"
+  posted_folder_id: "1I7wL6Dr65DuqDOC4w-e-DFuC5Hp_hL2d"
 
 defaults:                       # used when no sidecar and Gemini is unavailable; description is also given to Gemini as channel context
   description: ""
