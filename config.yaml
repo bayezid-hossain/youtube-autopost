@@ -1,12 +1,12 @@
 # Autopost settings. Times are 24h and MUST be in quotes ("18:00"), otherwise YAML misreads them.
 
 timezone: Asia/Dhaka            # your channel's IANA timezone
-publish_mode: public            # scheduled = upload private, YouTube auto-publishes at the slot time
+publish_mode: scheduled         # scheduled = upload private, YouTube auto-publishes at the slot time
                                 # private = upload as private drafts only
 daily_cap: 3                    # 1..6 (YouTube free API quota allows ~6 uploads/day)
 
 slots:                          # each slot must be later than 06:30; total slots <= daily_cap
-  videos: ["23:30"]  # TEMP public test
+  videos: ["08:45", "15:15", "21:00"]
 
 drive:                          # folder ID = the last part of the folder's URL in Drive
   queue_videos_folder_id: "12mq0P2FdznoCJDOt9w6cjwY9UIP9ycv8"   # shared folder (read-only)
