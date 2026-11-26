@@ -13,7 +13,7 @@ Autopost is a single-user, internal tool. Each day it takes video files that I (
 
 **Data storage:** No YouTube data is stored except the IDs of my own uploaded videos, kept in a log file in my private repository to prevent duplicate uploads.
 
-**Privacy policy URL:** <your GitHub Pages URL>/privacy-policy
-**Terms URL:** <your GitHub Pages URL>/terms
+**Privacy policy URL:** https://bayezid-hossain.github.io/autopost-policy/privacy-policy.html
+**Terms URL:** https://bayezid-hossain.github.io/autopost-policy/terms.html
 
 **Quota needed:** Default 10,000 units/day is enough (max 6 uploads/day). Requesting audit only to lift the private-only restriction on uploads from an unverified project.
