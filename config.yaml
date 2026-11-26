@@ -23,4 +23,4 @@ defaults:                       # used when no sidecar and Gemini is unavailable
   category_id: "20"             # 20 = Gaming
   made_for_kids: false
 
-gemini_model: gemini-2.5-flash
+gemini_model: gemini-3.8-flash
